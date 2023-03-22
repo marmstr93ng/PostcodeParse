@@ -9,3 +9,6 @@ __pycache__
 
 # Package releted files
 *.egg-info
+
+# VS Code
+.vscode

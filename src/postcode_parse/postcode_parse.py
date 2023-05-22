@@ -8,20 +8,20 @@ from sys import exit
 from tqdm import tqdm
 
 paf_format = {
-    "Organisation Name": 0,
-    "Department Name": 1,
-    "PO Box": 2,
-    "Building Name": 3,
-    "Sub-Building Name": 4,
-    "Building Number": 5,
-    "Thoroughfare": 6,
-    "Street": 7,
-    "Double Dependent Locality": 8,
-    "Dependent Locality": 9,
-    "Post Town": 10,
-    "Postcode": 11,
-    "Postcode Type": 12,
-    "DPS": 13
+    "Organisation Name": 11,
+    "Department Name": 10,
+    "PO Box": 9,
+    "Building Name": 7,
+    "Sub-Building Name": 8,
+    "Building Number": 6,
+    "Thoroughfare": 5,
+    "Street": 4,
+    "Double Dependent Locality": 3,
+    "Dependent Locality": 2,
+    "Post Town": 1,
+    "Postcode": 0,
+    "Postcode Type": 13,
+    "DPS": 15
 }
 
 ons_format = {
@@ -40,7 +40,7 @@ class PostcodeData(object):
 
 def postcode_parse(data_file_path, desired_postcode_district, ons_data_path, csv_flag, kml_flag):
     postcode_output_dict = {}
-    ons_data = open_ons_data(ons_data_path)
+    unlocated_postcodes = {}
 
     with open(data_file_path) as csv_file:
         lines = [line for line in csv_file]
@@ -49,21 +49,28 @@ def postcode_parse(data_file_path, desired_postcode_district, ons_data_path, csv
         ignore_header(csv_reader)
 
         for row in tqdm(csv_reader, total=len(lines)):
-            if is_not_business_paf(row) and is_small_postcode_type_paf(row):
-                if is_desired_postcode_district(row[paf_format["Postcode"]], desired_postcode_district):
-                    postcode = row[paf_format["Postcode"]]
-                    if postcode not in postcode_output_dict:
-                        latitude, longitude = retrieve_coords_ons(ons_data, postcode)
-                        postcode_output_dict[postcode] = PostcodeData(latitude, longitude)
+            if (is_not_business_paf(row) and is_small_postcode_type_paf(row) and
+                    is_desired_postcode_district(row[paf_format["Postcode"]], desired_postcode_district)):
+
+                postcode = row[paf_format["Postcode"]]
+
+                if postcode in postcode_output_dict:
+                    postcode_output_dict[postcode].address_count += 1
+                else:
+                    latitude, longitude = retrieve_coords_ons(ons_data_path, postcode)
+                    if is_postcode_not_located(latitude, longitude):
+                        unlocated_postcodes = add_to_unlocated_postcodes(postcode, unlocated_postcodes)
                     else:
-                        postcode_output_dict[postcode].address_count += 1
+                        postcode_output_dict[postcode] = PostcodeData(latitude, longitude)
 
     output_dir = os.path.join(os.getcwd(), "output")
     create_folder(output_dir)
+    path = os.path.join(output_dir, f"{'-'.join(desired_postcode_district)} Postcodes")
     if csv_flag:
-        csv_output(postcode_output_dict, os.path.join(output_dir, f"{desired_postcode_district} Postcodes.csv"))
+        csv_output(postcode_output_dict, f"{path}.csv")
     if kml_flag:
-        kml_output(postcode_output_dict, os.path.join(output_dir, f"{desired_postcode_district} Postcodes.kml"))
+        kml_output(postcode_output_dict, f"{path}.kml")
+    print(unlocated_postcodes)
 
 
 def ignore_header(reader_obj):
@@ -86,7 +93,20 @@ def is_desired_postcode_district(data, desired_postcode_district):
         print("ERROR: No postcode area match found!")
         exit(1)
     else:
-        return True if postcode_district == desired_postcode_district else False
+        return True if postcode_district in desired_postcode_district else False
+        # return True if postcode_district == desired_postcode_district else False
+
+
+def is_postcode_not_located(latitude, longitude):
+    return latitude is None or longitude is None
+
+
+def add_to_unlocated_postcodes(postcode, unlocated_postcodes):
+    if postcode in unlocated_postcodes:
+        unlocated_postcodes[postcode] += 1
+    else:
+        unlocated_postcodes[postcode] = 1
+    return unlocated_postcodes
 
 
 def open_ons_data(ons_data_path):
@@ -98,10 +118,13 @@ def open_ons_data(ons_data_path):
     return csv_reader
 
 
-def retrieve_coords_ons(ons_data, postcode):
+def retrieve_coords_ons(ons_data_path, postcode):
+    ons_data = open_ons_data(ons_data_path)
     for row in ons_data:
         if row[ons_format["Postcode"]] == postcode:
             return row[ons_format["Latitude"]], row[ons_format["Longitude"]]
+
+    return None, None
 
 
 def create_folder(path):
@@ -139,7 +162,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Parse Postcodes")
     parser.add_argument("-f", "--file", required=True, help="path to paf source file")
-    parser.add_argument("-p", "--postcode", required=True, help="postcode to parse for")
+    parser.add_argument("-p", "--postcode", nargs='+', required=True, help="postcodes to parse for")
     parser.add_argument("-d", "--data", required=True, help="path to ons postcode data csv")
     parser.add_argument("-c", "--csv_flag", action='store_true', help="write output to csv")
     parser.add_argument("-k", "--kml_flag", action='store_true', help="write output to kml")

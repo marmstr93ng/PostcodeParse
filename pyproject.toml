@@ -14,7 +14,9 @@ version = "0.0.0"
 
 [project.optional-dependencies]
 dev = [
-  "ruff"
+  "ruff",
+  "mypy",
+  "types-tqdm"
 ]
 
 [tool.ruff]
@@ -45,6 +47,12 @@ select = [
     # flake8-annotations
     "ANN",
 ]
+
+[[tool.mypy.overrides]]
+module = [
+    "simplekml"
+]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["setuptools"]

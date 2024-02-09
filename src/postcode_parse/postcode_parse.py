@@ -1,10 +1,10 @@
-import csv
-import re
 import argparse
-import simplekml
+import csv
 import os
-
+import re
 from sys import exit
+
+import simplekml
 from tqdm import tqdm
 
 paf_format = {
@@ -21,17 +21,13 @@ paf_format = {
     "Post Town": 1,
     "Postcode": 0,
     "Postcode Type": 13,
-    "DPS": 15
+    "DPS": 15,
 }
 
-ons_format = {
-    "Postcode": 2,
-    "Latitude": 42,
-    "Longitude": 43
-}
+ons_format = {"Postcode": 2, "Latitude": 42, "Longitude": 43}
 
 
-class PostcodeData(object):
+class PostcodeData:
     def __init__(self, latitude, longitude):
         self.address_count = 1
         self.latitude = latitude
@@ -43,15 +39,17 @@ def postcode_parse(data_file_path, desired_postcode_district, ons_data_path, csv
     unlocated_postcodes = {}
 
     with open(data_file_path) as csv_file:
-        lines = [line for line in csv_file]
+        lines = list(csv_file)
         csv_reader = csv.reader(lines, delimiter=",")
 
         ignore_header(csv_reader)
 
         for row in tqdm(csv_reader, total=len(lines)):
-            if (is_not_business_paf(row) and is_small_postcode_type_paf(row) and
-                    is_desired_postcode_district(row[paf_format["Postcode"]], desired_postcode_district)):
-
+            if (
+                is_not_business_paf(row)
+                and is_small_postcode_type_paf(row)
+                and is_desired_postcode_district(row[paf_format["Postcode"]], desired_postcode_district)
+            ):
                 postcode = row[paf_format["Postcode"]]
 
                 if postcode in postcode_output_dict:
@@ -93,8 +91,7 @@ def is_desired_postcode_district(data, desired_postcode_district):
         print("ERROR: No postcode area match found!")
         exit(1)
     else:
-        return True if postcode_district in desired_postcode_district else False
-        # return True if postcode_district == desired_postcode_district else False
+        return postcode_district in desired_postcode_district
 
 
 def is_postcode_not_located(latitude, longitude):
@@ -111,7 +108,7 @@ def add_to_unlocated_postcodes(postcode, unlocated_postcodes):
 
 def open_ons_data(ons_data_path):
     with open(ons_data_path) as csv_file:
-        lines = [line for line in csv_file]
+        lines = list(csv_file)
         csv_reader = csv.reader(lines, delimiter=",")
 
         ignore_header(csv_reader)
@@ -138,12 +135,14 @@ def csv_output(postcode_output_dict, output_path):
 
         writer.writeheader()
         for postcode, postcode_data in postcode_output_dict.items():
-            writer.writerow({
-                "postcode": postcode,
-                "address count": postcode_data.address_count,
-                "latitude": postcode_data.latitude,
-                "longitude": postcode_data.longitude
-            })
+            writer.writerow(
+                {
+                    "postcode": postcode,
+                    "address count": postcode_data.address_count,
+                    "latitude": postcode_data.latitude,
+                    "longitude": postcode_data.longitude,
+                }
+            )
 
 
 def kml_output(postcode_output_dict, output_path):
@@ -158,14 +157,13 @@ def kml_output(postcode_output_dict, output_path):
     kml.save(output_path)
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse Postcodes")
     parser.add_argument("-f", "--file", required=True, help="path to paf source file")
-    parser.add_argument("-p", "--postcode", nargs='+', required=True, help="postcodes to parse for")
+    parser.add_argument("-p", "--postcode", nargs="+", required=True, help="postcodes to parse for")
     parser.add_argument("-d", "--data", required=True, help="path to ons postcode data csv")
-    parser.add_argument("-c", "--csv_flag", action='store_true', help="write output to csv")
-    parser.add_argument("-k", "--kml_flag", action='store_true', help="write output to kml")
+    parser.add_argument("-c", "--csv_flag", action="store_true", help="write output to csv")
+    parser.add_argument("-k", "--kml_flag", action="store_true", help="write output to kml")
 
     args = parser.parse_args()
 

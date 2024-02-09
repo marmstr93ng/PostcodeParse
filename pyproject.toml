@@ -14,7 +14,36 @@ version = "0.0.0"
 
 [project.optional-dependencies]
 dev = [
-  "flake8"
+  "ruff"
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # pycodestyle warnings
+    "W",
+    # pyflakes
+    "F",
+    # flake8-comprehensions
+    "C",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # pep8-naming
+    "N",
+    # flake8-annotations
+    "ANN",
 ]
 
 [build-system]

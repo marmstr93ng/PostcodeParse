@@ -1,6 +1,6 @@
-# Seedsowers
+# Postcode Parse
 
-A mapping workflow for literature distribution
+An application to manipulate postcode data.
 
 ## Requirements
 

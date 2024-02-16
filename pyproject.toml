@@ -24,29 +24,19 @@ line-length = 120
 
 [tool.ruff.lint]
 select = [
-    # pycodestyle
-    "E",
-    # pycodestyle warnings
-    "W",
-    # pyflakes
-    "F",
-    # flake8-comprehensions
-    "C",
-    # pyupgrade
-    "UP",
-    # flake8-bugbear
-    "B",
-    # flake8-simplify
-    "SIM",
-    # isort
-    "I",
-    # mccabe
-    "C90",
-    # pep8-naming
-    "N",
-    # flake8-annotations
-    "ANN",
+    "E",   # pycodestyle
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "C4",   # flake8-comprehensions
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "I",   # isort
+    "C90", # mccabe
+    "N",   # pep8-naming
+    "ANN", # flake8-annotations
 ]
+ignore = ["ANN101"]
 
 [[tool.mypy.overrides]]
 module = [

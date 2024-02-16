@@ -3,38 +3,12 @@ import csv
 import os
 import re
 from sys import exit
-from typing import Dict, Iterator, List, Tuple, TypeVar, Union
+from typing import Dict, Iterator, List, Tuple, Union
 
 import simplekml
+from _constants import PostcodeData, SystemDefs
+from _log import create_logger
 from tqdm import tqdm
-
-paf_format = {
-    "Organisation Name": 11,
-    "Department Name": 10,
-    "PO Box": 9,
-    "Building Name": 7,
-    "Sub-Building Name": 8,
-    "Building Number": 6,
-    "Thoroughfare": 5,
-    "Street": 4,
-    "Double Dependent Locality": 3,
-    "Dependent Locality": 2,
-    "Post Town": 1,
-    "Postcode": 0,
-    "Postcode Type": 13,
-    "DPS": 15,
-}
-
-ons_format = {"Postcode": 2, "Latitude": 42, "Longitude": 43}
-
-PostcodeDataType = TypeVar("PostcodeDataType", bound="PostcodeData")
-
-
-class PostcodeData:
-    def __init__(self: PostcodeDataType, latitude: Union[str, None], longitude: Union[str, None]) -> None:
-        self.address_count = 1
-        self.latitude = latitude
-        self.longitude = longitude
 
 
 def postcode_parse(
@@ -50,21 +24,29 @@ def postcode_parse(
         ignore_header(csv_reader)
 
         for row in tqdm(csv_reader, total=len(lines)):
+            postcode = row[SystemDefs.PAF_FORMAT["Postcode"]]
+            logger.debug(f"Postcode: {postcode}")
+
             if (
                 is_not_business_paf(row)
                 and is_small_postcode_type_paf(row)
-                and is_desired_postcode_district(row[paf_format["Postcode"]], desired_postcode_district)
+                and is_desired_postcode_district(postcode, desired_postcode_district)
             ):
-                postcode = row[paf_format["Postcode"]]
-
                 if postcode in postcode_output_dict:
                     postcode_output_dict[postcode].address_count += 1
+                    logger.debug(f"{postcode} already exists. Count = {postcode_output_dict[postcode].address_count}")
                 else:
+                    logger.debug(f"{postcode} is new")
                     latitude, longitude = retrieve_coords_ons(ons_data_path, postcode)
+                    logger.debug(f"{postcode} coords: Latitude = {latitude} Longitude = {longitude}")
                     if is_postcode_not_located(latitude, longitude):
+                        logger.debug(f"{postcode} is not located.")
                         unlocated_postcodes = add_to_unlocated_postcodes(postcode, unlocated_postcodes)
                     else:
                         postcode_output_dict[postcode] = PostcodeData(latitude, longitude)
+                        logger.debug(f"{postcode} added to the dictionary: {postcode_output_dict.keys()}")
+            else:
+                logger.debug(f"{postcode} is NOT a desired address.")
 
     output_dir = os.path.join(os.getcwd(), "output")
     create_folder(output_dir)
@@ -81,11 +63,15 @@ def ignore_header(reader_obj: Iterator[List[str]]) -> None:
 
 
 def is_not_business_paf(data: list[str]) -> bool:
-    return data[paf_format["Organisation Name"]] == ""
+    is_not_business_flag = data[SystemDefs.PAF_FORMAT["Organisation Name"]] == ""
+    logger.debug(f"Is Not A Business: {is_not_business_flag}")
+    return is_not_business_flag
 
 
 def is_small_postcode_type_paf(data: list[str]) -> bool:
-    return data[paf_format["Postcode Type"]] == "S"
+    is_small_postcode = data[SystemDefs.PAF_FORMAT["Postcode Type"]] == "S"
+    logger.debug(f"Is A Small Postcode: {is_small_postcode}")
+    return is_small_postcode
 
 
 def is_desired_postcode_district(data: str, desired_postcode_district: str) -> bool:
@@ -96,18 +82,23 @@ def is_desired_postcode_district(data: str, desired_postcode_district: str) -> b
         print("ERROR: No postcode area match found!")
         exit(1)
 
-    return postcode_district in desired_postcode_district
+    is_desired_postcode = postcode_district in desired_postcode_district
+    logger.debug(f"{postcode_district} is in {desired_postcode_district}: {is_desired_postcode}")
+
+    return is_desired_postcode
 
 
 def is_postcode_not_located(latitude: Union[str, None], longitude: Union[str, None]) -> bool:
     return latitude is None or longitude is None
 
 
-def add_to_unlocated_postcodes(postcode: str, unlocated_postcodes: Dict[str, PostcodeData]) -> Dict[str, PostcodeData]:
+def add_to_unlocated_postcodes(postcode: str, unlocated_postcodes: Dict[str, int]) -> Dict[str, int]:
     if postcode in unlocated_postcodes:
-        unlocated_postcodes[postcode].address_count += 1
+        unlocated_postcodes[postcode] += 1
+        logger.debug(f"Adding 1 to {postcode} in unlocated postcodes dictionary: {unlocated_postcodes}")
     else:
-        unlocated_postcodes[postcode].address_count = 1
+        logger.debug(f"{postcode} in not in unlocated postcodes dictionary: {unlocated_postcodes}")
+        unlocated_postcodes[postcode] = 1
     return unlocated_postcodes
 
 
@@ -123,19 +114,21 @@ def open_ons_data(ons_data_path: str) -> Iterator[List[str]]:
 def retrieve_coords_ons(ons_data_path: str, postcode: str) -> Tuple[Union[str, None], Union[str, None]]:
     ons_data = open_ons_data(ons_data_path)
     for row in ons_data:
-        if row[ons_format["Postcode"]] == postcode:
-            return row[ons_format["Latitude"]], row[ons_format["Longitude"]]
+        if row[SystemDefs.ONS_FORMAT["Postcode"]] == postcode:
+            return row[SystemDefs.ONS_FORMAT["Latitude"]], row[SystemDefs.ONS_FORMAT["Longitude"]]
 
     return None, None
 
 
 def create_folder(path: str) -> None:
     if not os.path.exists(path):
+        logger.debug(f"Creating folder at {path}")
         os.makedirs(path)
 
 
 def csv_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) -> None:
     with open(output_path, mode="w", newline="") as csv_file:
+        logger.debug(f"Writing CSV to {output_path}")
         writer = csv.DictWriter(csv_file, fieldnames=["postcode", "address count", "latitude", "longitude"])
 
         writer.writeheader()
@@ -152,6 +145,7 @@ def csv_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) 
 
 def kml_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) -> None:
     kml = simplekml.Kml()
+    logger.debug(f"Writing KML to {output_path}")
 
     for postcode, postcode_data in postcode_output_dict.items():
         pnt = kml.newpoint()
@@ -163,6 +157,8 @@ def kml_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) 
 
 
 if __name__ == "__main__":
+    logger = create_logger(file_append=False)
+
     parser = argparse.ArgumentParser(description="Parse Postcodes")
     parser.add_argument("-f", "--file", required=True, help="path to paf source file")
     parser.add_argument("-p", "--postcode", nargs="+", required=True, help="postcodes to parse for")

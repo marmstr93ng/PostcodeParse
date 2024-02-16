@@ -15,7 +15,7 @@ def postcode_parse(
     data_file_path: str, desired_postcode_district: str, ons_data_path: str, csv_flag: bool, kml_flag: bool
 ) -> None:
     postcode_output_dict: Dict[str, PostcodeData] = {}
-    unlocated_postcodes: Dict[str, PostcodeData] = {}
+    unlocated_postcodes: Dict[str, int] = {}
 
     with open(data_file_path) as csv_file:
         lines = list(csv_file)

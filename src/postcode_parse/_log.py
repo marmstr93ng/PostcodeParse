@@ -1,5 +1,6 @@
 import logging
 import re
+from logging import LogRecord
 
 from _constants import SystemDefs
 
@@ -32,7 +33,7 @@ def create_logger(file_append: bool = False) -> logging.Logger:
 
 
 class _RemoveColorFilter(logging.Filter):
-    def filter(self, record: str) -> bool:
+    def filter(self, record: LogRecord) -> bool:
         """Remove the appended colour bytes."""
         ansi_re = re.compile(r"\x1b\[[0-9;]*m")
         if record and record.msg and isinstance(record.msg, str):

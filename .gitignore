@@ -18,3 +18,9 @@ output
 
 # Logging
 logging
+
+# Executable files
+*.exe
+*.spec
+build
+dist

@@ -14,9 +14,10 @@ version = "0.0.0"
 
 [project.optional-dependencies]
 dev = [
-  "ruff",
-  "pre-commit",
   "mypy",
+  "pyinstaller",
+  "pre-commit",
+  "ruff",
   "types-tqdm"
 ]
 

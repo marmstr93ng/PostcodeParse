@@ -14,7 +14,12 @@ from tqdm import tqdm
 
 
 def postcode_parse(
-    paf_file_path: str, desired_postcode_district: list[str], ons_data_path: str, csv_flag: bool, kml_flag: bool
+    paf_file_path: str,
+    desired_postcode_district: list[str],
+    ons_data_path: str,
+    csv_flag: bool,
+    kml_flag: bool,
+    disable_progress_bar: bool,
 ) -> None:
     postcode_output_dict: Dict[str, PostcodeData] = {}
     unlocated_postcodes: Dict[str, int] = {}
@@ -22,7 +27,7 @@ def postcode_parse(
     trim_ons_file(ons_data_path, desired_postcode_district)
 
     paf_data_reader, paf_data_length = create_csv_reader(paf_file_path)
-    for row in tqdm(paf_data_reader, total=paf_data_length):
+    for row in tqdm(paf_data_reader, total=paf_data_length, disable=disable_progress_bar):
         postcode = row[SystemDefs.PAF_FORMAT["Postcode"]]
         logger.debug(f"Postcode: {postcode}")
 
@@ -54,7 +59,7 @@ def postcode_parse(
         csv_output(postcode_output_dict, f"{path_without_ext}.csv")
     if kml_flag:
         kml_output(postcode_output_dict, f"{path_without_ext}.kml")
-    print(unlocated_postcodes)
+    logger.info(unlocated_postcodes)
 
 
 def trim_ons_file(ons_data_path: str, desired_postcode_district: List[str]) -> None:
@@ -91,7 +96,7 @@ def is_desired_postcode_district(data: str, desired_postcode_district: List[str]
     if postcode_district_match is not None:
         postcode_district = postcode_district_match.group(1)
     else:
-        print("ERROR: No postcode area match found!")
+        logger.error("ERROR: No postcode area match found!")
         exit(1)
 
     is_desired_postcode = postcode_district in desired_postcode_district
@@ -134,7 +139,7 @@ def retrieve_coords_ons(ons_data_path: str, postcode: str) -> Tuple[Union[str, N
 
 def create_folder(path: str) -> None:
     if not os.path.exists(path):
-        print(f"Creating folder at {path}")
+        logger.debug(f"Creating folder at {path}")
         os.makedirs(path)
 
 
@@ -173,7 +178,7 @@ def clean_tmp_folder(tmp_folder_path: str) -> None:
         shutil.rmtree(tmp_folder_path, ignore_errors=True)
         logger.debug(f"Deleting the tmp directory at {tmp_folder_path} and all its contents")
     except Exception as e:
-        print(f"An error occurred while deleting the folder '{tmp_folder_path}': {e}")
+        logger.error(f"An error occurred while deleting the folder '{tmp_folder_path}': {e}")
 
 
 if __name__ == "__main__":
@@ -185,14 +190,15 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--file", required=True, help="path to paf source file")
     parser.add_argument("-p", "--postcode", nargs="+", required=True, help="postcodes to parse for")
     parser.add_argument("-d", "--data", required=True, help="path to ons postcode data csv")
+    parser.add_argument("-b", "--disable_progress_bar", action="store_true", help="disable the progress bar")
     parser.add_argument("-c", "--csv_flag", action="store_true", help="write output to csv")
     parser.add_argument("-k", "--kml_flag", action="store_true", help="write output to kml")
 
     args = parser.parse_args()
 
     try:
-        postcode_parse(args.file, args.postcode, args.data, args.csv_flag, args.kml_flag)
+        postcode_parse(args.file, args.postcode, args.data, args.csv_flag, args.kml_flag, args.disable_progress_bar)
     except Exception as e:
-        print(f"An exception occurred: {e}")
+        logger.error(f"An exception occurred: {e}")
     finally:
         atexit._run_exitfuncs()

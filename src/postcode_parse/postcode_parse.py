@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 def postcode_parse(
     paf_file_path: str,
-    desired_postcode_district: list[str],
+    desired_postcode_districts: list[str],
     ons_data_path: str,
     csv_flag: bool,
     kml_flag: bool,
@@ -24,7 +24,7 @@ def postcode_parse(
     postcode_output_dict: Dict[str, PostcodeData] = {}
     unlocated_postcodes: Dict[str, int] = {}
 
-    trim_ons_file(ons_data_path, desired_postcode_district)
+    trim_ons_file(ons_data_path, desired_postcode_districts)
 
     paf_data_reader, paf_data_length = create_csv_reader(paf_file_path)
     for row in tqdm(paf_data_reader, total=paf_data_length, disable=disable_progress_bar):
@@ -34,7 +34,7 @@ def postcode_parse(
         if (
             is_not_business_paf(row)
             and is_small_postcode_type_paf(row)
-            and is_desired_postcode_district(postcode, desired_postcode_district)
+            and is_desired_postcode_district(postcode, desired_postcode_districts)
         ):
             if postcode in postcode_output_dict:
                 postcode_output_dict[postcode].address_count += 1
@@ -54,7 +54,7 @@ def postcode_parse(
             logger.debug(f"{postcode} is NOT a desired address.")
 
     create_folder(SystemDefs.OUTPUT_DIRECTORY)
-    path_without_ext = os.path.join(SystemDefs.OUTPUT_DIRECTORY, f"{'-'.join(desired_postcode_district)} Postcodes")
+    path_without_ext = os.path.join(SystemDefs.OUTPUT_DIRECTORY, f"{'-'.join(desired_postcode_districts)} Postcodes")
     if csv_flag:
         csv_output(postcode_output_dict, f"{path_without_ext}.csv")
     if kml_flag:
@@ -62,7 +62,7 @@ def postcode_parse(
     logger.info(unlocated_postcodes)
 
 
-def trim_ons_file(ons_data_path: str, desired_postcode_district: List[str]) -> None:
+def trim_ons_file(ons_data_path: str, desired_postcode_districts: List[str]) -> None:
     create_folder(SystemDefs.TEMP_DIRECTORY)
     with open(SystemDefs.TEMP_ONS_CSV, mode="w", newline="") as tmp_ons_csv:
         logger.debug(f"Creating tmp ONS CSV file at {SystemDefs.TEMP_ONS_CSV}")
@@ -70,7 +70,7 @@ def trim_ons_file(ons_data_path: str, desired_postcode_district: List[str]) -> N
         ons_data_reader, _ = create_csv_reader(ons_data_path, ignore_header_flag=False)
         for index, row in enumerate(ons_data_reader):
             if index == 0 or is_desired_postcode_district(
-                row[SystemDefs.ONS_FORMAT["Postcode"]], desired_postcode_district
+                row[SystemDefs.ONS_FORMAT["Postcode"]], desired_postcode_districts
             ):
                 csv_writer.writerow(row)
 
@@ -91,7 +91,7 @@ def is_small_postcode_type_paf(data: list[str]) -> bool:
     return is_small_postcode
 
 
-def is_desired_postcode_district(data: str, desired_postcode_district: List[str]) -> bool:
+def is_desired_postcode_district(data: str, desired_postcode_districts: List[str]) -> bool:
     postcode_district_match = re.match("^([A-Z]{1,2}[0-9]{1,2})", data)
     if postcode_district_match is not None:
         postcode_district = postcode_district_match.group(1)
@@ -99,8 +99,8 @@ def is_desired_postcode_district(data: str, desired_postcode_district: List[str]
         logger.error("ERROR: No postcode area match found!")
         exit(1)
 
-    is_desired_postcode = postcode_district in desired_postcode_district
-    logger.debug(f"{postcode_district} is in {desired_postcode_district}: {is_desired_postcode}")
+    is_desired_postcode = postcode_district in desired_postcode_districts
+    logger.debug(f"{postcode_district} is in {desired_postcode_districts}: {is_desired_postcode}")
 
     return is_desired_postcode
 
@@ -187,18 +187,13 @@ if __name__ == "__main__":
     logger = create_logger(file_append=False)
 
     parser = argparse.ArgumentParser(description="Parse Postcodes")
-    parser.add_argument("-f", "--file", required=True, help="path to paf source file")
-    parser.add_argument("-p", "--postcode", nargs="+", required=True, help="postcodes to parse for")
-    parser.add_argument("-d", "--data", required=True, help="path to ons postcode data csv")
+    parser.add_argument("-p", "--paf", required=True, help="path to paf file")
+    parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
+    parser.add_argument("-o", "--ons", required=True, help="path to ons postcode data")
     parser.add_argument("-b", "--disable_progress_bar", action="store_true", help="disable the progress bar")
     parser.add_argument("-c", "--csv_flag", action="store_true", help="write output to csv")
     parser.add_argument("-k", "--kml_flag", action="store_true", help="write output to kml")
 
     args = parser.parse_args()
 
-    try:
-        postcode_parse(args.file, args.postcode, args.data, args.csv_flag, args.kml_flag, args.disable_progress_bar)
-    except Exception as e:
-        logger.error(f"An exception occurred: {e}")
-    finally:
-        atexit._run_exitfuncs()
+    postcode_parse(args.paf, args.districts, args.ons, args.csv_flag, args.kml_flag, args.disable_progress_bar)

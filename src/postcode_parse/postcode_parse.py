@@ -7,6 +7,7 @@ import shutil
 from sys import exit
 from typing import Dict, Iterator, List, Tuple, Union
 
+import questionary
 import simplekml
 from _constants import PostcodeData, SystemDefs
 from _log import create_logger
@@ -15,7 +16,7 @@ from tqdm import tqdm
 
 def postcode_parse(
     paf_file_path: str,
-    desired_postcode_districts: list[str],
+    desired_postcode_districts: List[str],
     ons_data_path: str,
     csv_flag: bool,
     kml_flag: bool,
@@ -85,7 +86,7 @@ def is_not_business_paf(data: list[str]) -> bool:
     return is_not_business_flag
 
 
-def is_small_postcode_type_paf(data: list[str]) -> bool:
+def is_small_postcode_type_paf(data: List[str]) -> bool:
     is_small_postcode = data[SystemDefs.PAF_FORMAT["Postcode Type"]] == "S"
     logger.debug(f"Is A Small Postcode: {is_small_postcode}")
     return is_small_postcode
@@ -181,19 +182,45 @@ def clean_tmp_folder(tmp_folder_path: str) -> None:
         logger.error(f"An error occurred while deleting the folder '{tmp_folder_path}': {e}")
 
 
+def guided_option_entry() -> Tuple[str, List[str], str, bool, bool, bool]:
+    paf_path = questionary.path("What is the path to the PAF file?").ask()
+
+    districts = []
+    while True:
+        districts.append(questionary.text("What postcode districts should be extracted?").ask())
+        if not questionary.confirm("Add another district to extract?").ask():
+            break
+
+    ons_path = questionary.path("What is the path to the ONS Postcode File?").ask()
+    csv_flag = questionary.confirm("Create a CSV output?").ask()
+    kml_flag = questionary.confirm("Create a KML output?").ask()
+    disable_progress_flag = questionary.confirm("Disable the progress bar?", default=False).ask()
+    return (paf_path, districts, ons_path, csv_flag, kml_flag, disable_progress_flag)
+
+
 if __name__ == "__main__":
     atexit.register(clean_tmp_folder, SystemDefs.TEMP_DIRECTORY)
     create_folder(SystemDefs.LOG_DIRECTORY)
     logger = create_logger(file_append=False)
 
     parser = argparse.ArgumentParser(description="Parse Postcodes")
-    parser.add_argument("-p", "--paf", required=True, help="path to paf file")
-    parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
-    parser.add_argument("-o", "--ons", required=True, help="path to ons postcode data")
-    parser.add_argument("-b", "--disable_progress_bar", action="store_true", help="disable the progress bar")
-    parser.add_argument("-c", "--csv_flag", action="store_true", help="write output to csv")
-    parser.add_argument("-k", "--kml_flag", action="store_true", help="write output to kml")
+    subparsers = parser.add_subparsers(title="Mode", dest="mode", help="Select the run mode of the script")
 
+    guided_parser = subparsers.add_parser("guided", help="guide the user through the script option entry")
+
+    manual_parser = subparsers.add_parser("manual", help="manually enter the script options")
+    manual_parser.add_argument("-p", "--paf", required=True, help="path to paf file")
+    manual_parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
+    manual_parser.add_argument("-o", "--ons", required=True, help="path to ons postcode data")
+    manual_parser.add_argument("-c", "--csv_flag", action="store_true", help="write output to csv")
+    manual_parser.add_argument("-k", "--kml_flag", action="store_true", help="write output to kml")
+    manual_parser.add_argument("-b", "--disable_progress_bar", action="store_true", help="disable the progress bar")
+
+    parser.set_defaults(mode="guided")
     args = parser.parse_args()
+    if args.mode == "guided":
+        options = guided_option_entry()
+    elif args.mode == "manual":
+        options = (args.paf, args.districts, args.ons, args.csv_flag, args.kml_flag, args.disable_progress_bar)
 
-    postcode_parse(args.paf, args.districts, args.ons, args.csv_flag, args.kml_flag, args.disable_progress_bar)
+    postcode_parse(*options)

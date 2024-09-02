@@ -174,14 +174,6 @@ def kml_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) 
     kml.save(output_path)
 
 
-def clean_tmp_folder(tmp_folder_path: str) -> None:
-    try:
-        shutil.rmtree(tmp_folder_path, ignore_errors=True)
-        logger.debug(f"Deleting the tmp directory at {tmp_folder_path} and all its contents")
-    except Exception as e:
-        logger.error(f"An error occurred while deleting the folder '{tmp_folder_path}': {e}")
-
-
 def guided_option_entry() -> Tuple[str, List[str], str, bool, bool, bool]:
     paf_path = questionary.path("What is the path to the PAF file?").ask()
 
@@ -199,8 +191,8 @@ def guided_option_entry() -> Tuple[str, List[str], str, bool, bool, bool]:
 
 
 if __name__ == "__main__":
-    atexit.register(clean_tmp_folder, SystemDefs.TEMP_DIRECTORY)
-    create_folder(SystemDefs.LOG_DIRECTORY)
+    atexit.register(input, "Press Enter to exit...")
+    create_folder(SystemDefs.TEMP_DIRECTORY)
     logger = create_logger(file_append=False)
 
     parser = argparse.ArgumentParser(description="Parse Postcodes")
@@ -224,3 +216,4 @@ if __name__ == "__main__":
         options = (args.paf, args.districts, args.ons, args.csv_flag, args.kml_flag, args.disable_progress_bar)
 
     postcode_parse(*options)
+    os.startfile(SystemDefs.OUTPUT_DIRECTORY)

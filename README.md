@@ -10,7 +10,9 @@ An application to manipulate postcode data.
 
 ## Build Exe
 
-- `pyinstaller --onefile src/postcode_parse/postcode_parse.py`
+- `pyinstaller --onefile src/postcode_parse/postcode_parse.py --clean`
+- Compile the `postcode_parser.iss` in Inno Setup Compiler
+- Run the installer (to install or to update)
 
 ## Launching
 

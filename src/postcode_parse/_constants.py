@@ -3,13 +3,13 @@ from typing import Union
 
 
 class SystemDefs:
-    LOG_DIRECTORY = "logging"
-    LOGGING_FILE_PATH = os.path.join(LOG_DIRECTORY, "log.log")
+    TEMP_FOLDER = os.getenv('TEMP')
+    TEMP_DIRECTORY = os.path.join(TEMP_FOLDER, "PostcodeParser")
+    LOGGING_FILE_PATH = os.path.join(TEMP_DIRECTORY, "log.log")
 
-    TEMP_DIRECTORY = ".tmp"
     TEMP_ONS_CSV = os.path.join(TEMP_DIRECTORY, "tmp_ons_data.csv")
 
-    OUTPUT_DIRECTORY = "output"
+    OUTPUT_DIRECTORY = os.path.join(TEMP_DIRECTORY, "output")
 
     PAF_FORMAT = {
         "Organisation Name": 11,

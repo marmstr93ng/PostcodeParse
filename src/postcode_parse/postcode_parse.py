@@ -3,7 +3,6 @@ import atexit
 import csv
 import os
 import re
-import shutil
 from sys import exit
 from typing import Dict, Iterator, List, Tuple, Union
 
@@ -140,7 +139,7 @@ def retrieve_coords_ons(ons_data_path: str, postcode: str) -> Tuple[Union[str, N
 
 def create_folder(path: str) -> None:
     if not os.path.exists(path):
-        logger.debug(f"Creating folder at {path}")
+        # print(f"Creating folder at {path}")
         os.makedirs(path)
 
 

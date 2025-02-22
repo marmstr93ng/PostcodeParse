@@ -1,10 +1,17 @@
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.2.1
+  rev: v0.9.6
   hooks:
-    # Run the linter.
     - id: ruff
       args: [ --fix ]
-    # Run the formatter.
     - id: ruff-format
+
+- repo: local
+  hooks:
+    - id: compile_check
+      name: compile_check
+      language: python
+      entry: python -W error -m compileall src
+      types: [python]
+      stages: [pre-commit]
+      pass_filenames: false

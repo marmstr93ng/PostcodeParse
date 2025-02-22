@@ -3,7 +3,7 @@ from typing import Union
 
 
 class SystemDefs:
-    TEMP_FOLDER = os.getenv('TEMP')
+    TEMP_FOLDER = os.getenv("TEMP")
     TEMP_DIRECTORY = os.path.join(TEMP_FOLDER, "PostcodeParser")
     LOGGING_FILE_PATH = os.path.join(TEMP_DIRECTORY, "log.log")
 
@@ -28,7 +28,7 @@ class SystemDefs:
         "DPS": 15,
     }
 
-    ONS_FORMAT = {"Postcode": 2, "Latitude": 42, "Longitude": 43}
+    ONS_FORMAT = {"Postcode": 2, "Latitude": 41, "Longitude": 42}
 
 
 class PostcodeData:

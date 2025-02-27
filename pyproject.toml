@@ -39,7 +39,6 @@ select = [
     "N",   # pep8-naming
     "ANN", # flake8-annotations
 ]
-ignore = ["ANN101"]
 
 [[tool.mypy.overrides]]
 module = [

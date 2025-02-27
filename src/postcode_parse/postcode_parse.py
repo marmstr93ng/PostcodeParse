@@ -17,8 +17,6 @@ def postcode_parse(
     paf_file_path: str,
     desired_postcode_districts: List[str],
     ons_data_path: str,
-    csv_flag: bool,
-    kml_flag: bool,
     disable_progress_bar: bool,
 ) -> None:
     postcode_output_dict: Dict[str, PostcodeData] = {}
@@ -55,10 +53,8 @@ def postcode_parse(
 
     create_folder(SystemDefs.OUTPUT_DIRECTORY)
     path_without_ext = os.path.join(SystemDefs.OUTPUT_DIRECTORY, f"{'-'.join(desired_postcode_districts)} Postcodes")
-    if csv_flag:
-        csv_output(postcode_output_dict, f"{path_without_ext}.csv")
-    if kml_flag:
-        kml_output(postcode_output_dict, f"{path_without_ext}.kml")
+    csv_output(postcode_output_dict, f"{path_without_ext}.csv")
+    kml_output(postcode_output_dict, f"{path_without_ext}.kml")
     logger.info(unlocated_postcodes)
 
 
@@ -139,7 +135,6 @@ def retrieve_coords_ons(ons_data_path: str, postcode: str) -> Tuple[Union[str, N
 
 def create_folder(path: str) -> None:
     if not os.path.exists(path):
-        # print(f"Creating folder at {path}")
         os.makedirs(path)
 
 
@@ -183,10 +178,8 @@ def guided_option_entry() -> Tuple[str, List[str], str, bool, bool, bool]:
             break
 
     ons_path = questionary.path("What is the path to the ONS Postcode File?").ask()
-    csv_flag = questionary.confirm("Create a CSV output?").ask()
-    kml_flag = questionary.confirm("Create a KML output?").ask()
     disable_progress_flag = questionary.confirm("Disable the progress bar?", default=False).ask()
-    return (paf_path, districts, ons_path, csv_flag, kml_flag, disable_progress_flag)
+    return (paf_path, districts, ons_path, disable_progress_flag)
 
 
 if __name__ == "__main__":
@@ -203,8 +196,6 @@ if __name__ == "__main__":
     manual_parser.add_argument("-p", "--paf", required=True, help="path to paf file")
     manual_parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
     manual_parser.add_argument("-o", "--ons", required=True, help="path to ons postcode data")
-    manual_parser.add_argument("-c", "--csv_flag", action="store_true", help="write output to csv")
-    manual_parser.add_argument("-k", "--kml_flag", action="store_true", help="write output to kml")
     manual_parser.add_argument("-b", "--disable_progress_bar", action="store_true", help="disable the progress bar")
 
     parser.set_defaults(mode="guided")
@@ -212,7 +203,7 @@ if __name__ == "__main__":
     if args.mode == "guided":
         options = guided_option_entry()
     elif args.mode == "manual":
-        options = (args.paf, args.districts, args.ons, args.csv_flag, args.kml_flag, args.disable_progress_bar)
+        options = (args.paf, args.districts, args.ons, args.disable_progress_bar)
 
     postcode_parse(*options)
     os.startfile(SystemDefs.OUTPUT_DIRECTORY)

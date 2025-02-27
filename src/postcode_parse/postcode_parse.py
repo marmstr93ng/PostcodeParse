@@ -17,7 +17,6 @@ def postcode_parse(
     paf_file_path: str,
     desired_postcode_districts: List[str],
     ons_data_path: str,
-    disable_progress_bar: bool,
 ) -> None:
     postcode_output_dict: Dict[str, PostcodeData] = {}
     unlocated_postcodes: Dict[str, int] = {}
@@ -25,7 +24,7 @@ def postcode_parse(
     trim_ons_file(ons_data_path, desired_postcode_districts)
 
     paf_data_reader, paf_data_length = create_csv_reader(paf_file_path)
-    for row in tqdm(paf_data_reader, total=paf_data_length, disable=disable_progress_bar):
+    for row in tqdm(paf_data_reader, total=paf_data_length):
         postcode = row[SystemDefs.PAF_FORMAT["Postcode"]]
         logger.debug(f"Postcode: {postcode}")
 
@@ -178,8 +177,7 @@ def guided_option_entry() -> Tuple[str, List[str], str, bool, bool, bool]:
             break
 
     ons_path = questionary.path("What is the path to the ONS Postcode File?").ask()
-    disable_progress_flag = questionary.confirm("Disable the progress bar?", default=False).ask()
-    return (paf_path, districts, ons_path, disable_progress_flag)
+    return (paf_path, districts, ons_path)
 
 
 if __name__ == "__main__":
@@ -196,14 +194,13 @@ if __name__ == "__main__":
     manual_parser.add_argument("-p", "--paf", required=True, help="path to paf file")
     manual_parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
     manual_parser.add_argument("-o", "--ons", required=True, help="path to ons postcode data")
-    manual_parser.add_argument("-b", "--disable_progress_bar", action="store_true", help="disable the progress bar")
 
     parser.set_defaults(mode="guided")
     args = parser.parse_args()
     if args.mode == "guided":
         options = guided_option_entry()
     elif args.mode == "manual":
-        options = (args.paf, args.districts, args.ons, args.disable_progress_bar)
+        options = (args.paf, args.districts, args.ons)
 
     postcode_parse(*options)
     os.startfile(SystemDefs.OUTPUT_DIRECTORY)

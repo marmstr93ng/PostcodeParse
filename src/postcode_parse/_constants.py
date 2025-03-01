@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Union
 
 
@@ -7,6 +8,12 @@ class SystemDefs:
     TEMP_DIRECTORY = os.path.join(TEMP_FOLDER, "PostcodeParser")
     LOGGING_FILE_PATH = os.path.join(TEMP_DIRECTORY, "log.log")
 
+    EVENTS_FOLDER_NAME = "🛠️ Events"
+    DATA_FOLDER_NAME = "🗂️ Data"
+    PAF_FILE_NAME = "PAF.csv"
+    ONS_FOLDER_NAME = "ONSPD_AUG_2024"
+
+    TEMP_PAF_CSV = os.path.join(TEMP_DIRECTORY, "tmp_paf_data.csv")
     TEMP_ONS_CSV = os.path.join(TEMP_DIRECTORY, "tmp_ons_data.csv")
 
     OUTPUT_DIRECTORY = os.path.join(TEMP_DIRECTORY, "output")
@@ -29,6 +36,8 @@ class SystemDefs:
     }
 
     ONS_FORMAT = {"Postcode": 2, "Latitude": 41, "Longitude": 42}
+
+    POSTCODE_DISTRICT_PATTERN = re.compile(r"^([A-Z]{1,2}[0-9]{1,2})")
 
 
 class PostcodeData:

@@ -13,7 +13,7 @@ def create_logger(file_append: bool = False) -> logging.Logger:
     remove_color_filter = _RemoveColorFilter()
 
     file_mode = "a" if file_append else "w"
-    file_handler = logging.FileHandler(SystemDefs.LOGGING_FILE_PATH, file_mode)
+    file_handler = logging.FileHandler(SystemDefs.LOGGING_FILE_PATH, file_mode, "utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)8s] --- (%(filename)15s:%(lineno)4s) %(message)s", "%Y-%m-%d %H:%M:%S"

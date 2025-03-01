@@ -3,8 +3,7 @@ import atexit
 import csv
 import os
 import re
-from sys import exit
-from typing import Dict, Iterator, List, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 import questionary
 import simplekml
@@ -13,42 +12,100 @@ from _log import create_logger
 from tqdm import tqdm
 
 
-def postcode_parse(
-    paf_file_path: str,
-    desired_postcode_districts: List[str],
-    ons_data_path: str,
-) -> None:
+def create_folder(path: str) -> None:
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
+def guided_option_entry() -> Tuple[str, List[str]]:
+    space_path = questionary.path("What is the path to the SeedSowers Google Drive space?").ask()
+
+    districts = set()
+    while True:
+        districts.add(questionary.text("What postcode districts should be extracted?").ask())
+        if not questionary.confirm("Add another district to extract?").ask():
+            break
+
+    return (space_path, districts)
+
+
+def data_transformation(space_path: str, desired_postcode_districts: Set[str]) -> Tuple[str, str]:
+    data_folder_path = os.path.join(space_path, SystemDefs.DATA_FOLDER_NAME)
+
+    paf_file_path = os.path.join(data_folder_path, SystemDefs.PAF_FILE_NAME)
+    final_paf_path = trim_file(
+        paf_file_path, desired_postcode_districts, SystemDefs.PAF_FORMAT["Postcode"], SystemDefs.TEMP_PAF_CSV
+    )
+
+    ons_folder_path = os.path.join(data_folder_path, SystemDefs.ONS_FOLDER_NAME)
+    ons_file_path = find_ons_file(ons_folder_path, list(desired_postcode_districts)[0])
+    final_ons_path = trim_file(
+        ons_file_path, desired_postcode_districts, SystemDefs.ONS_FORMAT["Postcode"], SystemDefs.TEMP_ONS_CSV
+    )
+
+    return (final_paf_path, final_ons_path)
+
+
+def find_ons_file(ons_folder_path: str, outward_code: str) -> str:
+    outward_code_letters = re.sub(r"\d", "", outward_code)
+
+    ons_files = os.listdir(ons_folder_path)
+    for ons_file in ons_files:
+        if ons_file.startswith(f"{SystemDefs.ONS_FOLDER_NAME}_UK_") and ons_file.endswith(".csv"):
+            ons_file_outward_code = os.path.splitext(ons_file)[0].split("_")[-1]
+
+            if outward_code_letters == ons_file_outward_code:
+                return os.path.join(ons_folder_path, ons_file)
+    raise Exception(f"ONS file for {outward_code} couldn't be found in {ons_folder_path}")
+
+
+def trim_file(data_path: str, desired_postcode_districts: Set[str], postcode_index: str, output_path: str) -> str:
+    total_rows = get_file_length(data_path)
+
+    with open(data_path, newline="") as input_file, open(output_path, "w", newline="") as output_file:
+        csv_reader = csv.reader(input_file)
+        csv_writer = csv.writer(output_file)
+
+        for row in tqdm(csv_reader, total=total_rows, desc=f"Trimming {data_path}"):
+            if is_desired_postcode_district(row[postcode_index], set(desired_postcode_districts)):
+                csv_writer.writerow(row)
+
+    return output_path
+
+
+def postcode_parse(paf_file_path: str, ons_data_path: str, desired_postcode_districts: Set[str]) -> None:
     postcode_output_dict: Dict[str, PostcodeData] = {}
     unlocated_postcodes: Dict[str, int] = {}
 
-    trim_ons_file(ons_data_path, desired_postcode_districts)
+    paf_data_length = get_file_length(paf_file_path)
 
-    paf_data_reader, paf_data_length = create_csv_reader(paf_file_path)
-    for row in tqdm(paf_data_reader, total=paf_data_length):
-        postcode = row[SystemDefs.PAF_FORMAT["Postcode"]]
-        logger.debug(f"Postcode: {postcode}")
+    with open(paf_file_path, newline="") as paf_file:
+        paf_data_reader = csv.reader(paf_file)
 
-        if (
-            is_not_business_paf(row)
-            and is_small_postcode_type_paf(row)
-            and is_desired_postcode_district(postcode, desired_postcode_districts)
-        ):
-            if postcode in postcode_output_dict:
-                postcode_output_dict[postcode].address_count += 1
-                logger.debug(f"{postcode} already exists. Count = {postcode_output_dict[postcode].address_count}")
-            else:
-                logger.debug(f"{postcode} is new")
-                latitude, longitude = retrieve_coords_ons(SystemDefs.TEMP_ONS_CSV, postcode)
-                logger.debug(f"{postcode} coords: Latitude = {latitude} Longitude = {longitude}")
+        for row in tqdm(paf_data_reader, total=paf_data_length):
+            postcode = row[SystemDefs.PAF_FORMAT["Postcode"]]
+            logger.debug(f"Postcode: {postcode}")
 
-                if is_postcode_not_located(latitude, longitude):
-                    logger.debug(f"{postcode} is not located.")
-                    unlocated_postcodes = add_to_unlocated_postcodes(postcode, unlocated_postcodes)
+            is_not_business_flag = row[SystemDefs.PAF_FORMAT["Organisation Name"]] == ""
+            is_small_postcode_flag = row[SystemDefs.PAF_FORMAT["Postcode Type"]] == "S"
+            is_desired_postcode_district_flag = is_desired_postcode_district(postcode, desired_postcode_districts)
+            if is_not_business_flag and is_small_postcode_flag and is_desired_postcode_district_flag:
+                if postcode in postcode_output_dict:
+                    postcode_output_dict[postcode].address_count += 1
+                    logger.debug(f"{postcode} already exists. Count = {postcode_output_dict[postcode].address_count}")
                 else:
-                    postcode_output_dict[postcode] = PostcodeData(latitude, longitude)
-                    logger.debug(f"{postcode} added to the dictionary: {postcode_output_dict.keys()}")
-        else:
-            logger.debug(f"{postcode} is NOT a desired address.")
+                    logger.debug(f"{postcode} is new")
+                    latitude, longitude = retrieve_coords_ons(ons_data_path, postcode)
+                    logger.debug(f"{postcode} coords: Latitude = {latitude} Longitude = {longitude}")
+
+                    if latitude is None or longitude is None:
+                        logger.debug(f"{postcode} is not located.")
+                        unlocated_postcodes = add_to_unlocated_postcodes(postcode, unlocated_postcodes)
+                    else:
+                        postcode_output_dict[postcode] = PostcodeData(latitude, longitude)
+                        logger.debug(f"{postcode} added to the dictionary: {postcode_output_dict.keys()}")
+            else:
+                logger.debug(f"{postcode} is NOT a desired address.")
 
     create_folder(SystemDefs.OUTPUT_DIRECTORY)
     path_without_ext = os.path.join(SystemDefs.OUTPUT_DIRECTORY, f"{'-'.join(desired_postcode_districts)} Postcodes")
@@ -57,51 +114,29 @@ def postcode_parse(
     logger.info(unlocated_postcodes)
 
 
-def trim_ons_file(ons_data_path: str, desired_postcode_districts: List[str]) -> None:
-    create_folder(SystemDefs.TEMP_DIRECTORY)
-    with open(SystemDefs.TEMP_ONS_CSV, mode="w", newline="") as tmp_ons_csv:
-        logger.debug(f"Creating tmp ONS CSV file at {SystemDefs.TEMP_ONS_CSV}")
-        csv_writer = csv.writer(tmp_ons_csv)
-        ons_data_reader, _ = create_csv_reader(ons_data_path, ignore_header_flag=False)
-        for index, row in enumerate(ons_data_reader):
-            if index == 0 or is_desired_postcode_district(
-                row[SystemDefs.ONS_FORMAT["Postcode"]], desired_postcode_districts
-            ):
-                csv_writer.writerow(row)
+def get_file_length(file_path: str) -> int:
+    logger.info(f"Getting file length for {file_path}")
+    with open(file_path, newline="") as file:
+        return sum(1 for _ in file)
 
 
-def ignore_header(reader_obj: Iterator[List[str]]) -> None:
-    next(reader_obj)
+def is_desired_postcode_district(data: str, desired_postcode_districts: Set[str]) -> bool:
+    match = SystemDefs.POSTCODE_DISTRICT_PATTERN.match(data)
+    if match:
+        postcode_district = match.group(1)
+        return postcode_district in desired_postcode_districts
+    return False
 
 
-def is_not_business_paf(data: list[str]) -> bool:
-    is_not_business_flag = data[SystemDefs.PAF_FORMAT["Organisation Name"]] == ""
-    logger.debug(f"Is Not A Business: {is_not_business_flag}")
-    return is_not_business_flag
+def retrieve_coords_ons(ons_data_path: str, postcode: str) -> Tuple[Union[str, None], Union[str, None]]:
+    with open(ons_data_path, newline="") as file:
+        csv_reader = csv.reader(file)
 
+        for row in csv_reader:
+            if row[SystemDefs.ONS_FORMAT["Postcode"]] == postcode:
+                return row[SystemDefs.ONS_FORMAT["Latitude"]], row[SystemDefs.ONS_FORMAT["Longitude"]]
 
-def is_small_postcode_type_paf(data: List[str]) -> bool:
-    is_small_postcode = data[SystemDefs.PAF_FORMAT["Postcode Type"]] == "S"
-    logger.debug(f"Is A Small Postcode: {is_small_postcode}")
-    return is_small_postcode
-
-
-def is_desired_postcode_district(data: str, desired_postcode_districts: List[str]) -> bool:
-    postcode_district_match = re.match("^([A-Z]{1,2}[0-9]{1,2})", data)
-    if postcode_district_match is not None:
-        postcode_district = postcode_district_match.group(1)
-    else:
-        logger.error("ERROR: No postcode area match found!")
-        exit(1)
-
-    is_desired_postcode = postcode_district in desired_postcode_districts
-    logger.debug(f"{postcode_district} is in {desired_postcode_districts}: {is_desired_postcode}")
-
-    return is_desired_postcode
-
-
-def is_postcode_not_located(latitude: Union[str, None], longitude: Union[str, None]) -> bool:
-    return latitude is None or longitude is None
+    return None, None
 
 
 def add_to_unlocated_postcodes(postcode: str, unlocated_postcodes: Dict[str, int]) -> Dict[str, int]:
@@ -112,29 +147,6 @@ def add_to_unlocated_postcodes(postcode: str, unlocated_postcodes: Dict[str, int
         logger.debug(f"{postcode} in not in unlocated postcodes dictionary: {unlocated_postcodes}")
         unlocated_postcodes[postcode] = 1
     return unlocated_postcodes
-
-
-def create_csv_reader(csv_path: str, ignore_header_flag: bool = True) -> Tuple[Iterator[List[str]], int]:
-    with open(csv_path) as csv_file:
-        lines = list(csv_file)
-        csv_reader = csv.reader(lines, delimiter=",")
-        if ignore_header_flag:
-            ignore_header(csv_reader)
-    return csv_reader, len(lines)
-
-
-def retrieve_coords_ons(ons_data_path: str, postcode: str) -> Tuple[Union[str, None], Union[str, None]]:
-    ons_data_reader, _ = create_csv_reader(ons_data_path)
-    for row in ons_data_reader:
-        if row[SystemDefs.ONS_FORMAT["Postcode"]] == postcode:
-            return row[SystemDefs.ONS_FORMAT["Latitude"]], row[SystemDefs.ONS_FORMAT["Longitude"]]
-
-    return None, None
-
-
-def create_folder(path: str) -> None:
-    if not os.path.exists(path):
-        os.makedirs(path)
 
 
 def csv_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) -> None:
@@ -167,19 +179,6 @@ def kml_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) 
     kml.save(output_path)
 
 
-def guided_option_entry() -> Tuple[str, List[str], str, bool, bool, bool]:
-    paf_path = questionary.path("What is the path to the PAF file?").ask()
-
-    districts = []
-    while True:
-        districts.append(questionary.text("What postcode districts should be extracted?").ask())
-        if not questionary.confirm("Add another district to extract?").ask():
-            break
-
-    ons_path = questionary.path("What is the path to the ONS Postcode File?").ask()
-    return (paf_path, districts, ons_path)
-
-
 if __name__ == "__main__":
     atexit.register(input, "Press Enter to exit...")
     create_folder(SystemDefs.TEMP_DIRECTORY)
@@ -191,16 +190,16 @@ if __name__ == "__main__":
     guided_parser = subparsers.add_parser("guided", help="guide the user through the script option entry")
 
     manual_parser = subparsers.add_parser("manual", help="manually enter the script options")
-    manual_parser.add_argument("-p", "--paf", required=True, help="path to paf file")
+    manual_parser.add_argument("-s", "--space_path", required=True, help="path to Seedsowers Google Drive space")
     manual_parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
-    manual_parser.add_argument("-o", "--ons", required=True, help="path to ons postcode data")
 
     parser.set_defaults(mode="guided")
     args = parser.parse_args()
     if args.mode == "guided":
-        options = guided_option_entry()
+        space_path, districts = guided_option_entry()
     elif args.mode == "manual":
-        options = (args.paf, args.districts, args.ons)
+        space_path, districts = args.space_path, set(args.districts)
 
-    postcode_parse(*options)
+    paf_file_path, ons_data_path = data_transformation(space_path, districts)
+    postcode_parse(paf_file_path, ons_data_path, districts)
     os.startfile(SystemDefs.OUTPUT_DIRECTORY)

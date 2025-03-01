@@ -3,7 +3,7 @@ import atexit
 import csv
 import os
 import re
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, Set, Tuple, Union
 
 import questionary
 import simplekml
@@ -17,7 +17,7 @@ def create_folder(path: str) -> None:
         os.makedirs(path)
 
 
-def guided_option_entry() -> Tuple[str, List[str]]:
+def guided_option_entry() -> Tuple[str, Set[str]]:
     space_path = questionary.path("What is the path to the SeedSowers Google Drive space?").ask()
 
     districts = set()
@@ -59,7 +59,7 @@ def find_ons_file(ons_folder_path: str, outward_code: str) -> str:
     raise Exception(f"ONS file for {outward_code} couldn't be found in {ons_folder_path}")
 
 
-def trim_file(data_path: str, desired_postcode_districts: Set[str], postcode_index: str, output_path: str) -> str:
+def trim_file(data_path: str, desired_postcode_districts: Set[str], postcode_index: int, output_path: str) -> str:
     total_rows = get_file_length(data_path)
 
     with open(data_path, newline="") as input_file, open(output_path, "w", newline="") as output_file:
@@ -67,7 +67,7 @@ def trim_file(data_path: str, desired_postcode_districts: Set[str], postcode_ind
         csv_writer = csv.writer(output_file)
 
         for row in tqdm(csv_reader, total=total_rows, desc=f"Trimming {data_path}"):
-            if is_desired_postcode_district(row[postcode_index], set(desired_postcode_districts)):
+            if is_desired_postcode_district(row[postcode_index], desired_postcode_districts):
                 csv_writer.writerow(row)
 
     return output_path
@@ -181,7 +181,7 @@ def kml_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) 
 
 if __name__ == "__main__":
     atexit.register(input, "Press Enter to exit...")
-    create_folder(SystemDefs.TEMP_DIRECTORY)
+    create_folder(SystemDefs.BASE_DIRECTORY)
     logger = create_logger(file_append=False)
 
     parser = argparse.ArgumentParser(description="Parse Postcodes")

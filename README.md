@@ -1,6 +1,6 @@
 # Postcode Parse
 
-An application to manipulate postcode data.
+An application to manipulate postcode data (Windows ONLY).
 
 ## Requirements
 

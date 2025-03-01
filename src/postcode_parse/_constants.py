@@ -4,19 +4,19 @@ from typing import Union
 
 
 class SystemDefs:
-    TEMP_FOLDER = os.getenv("TEMP")
-    TEMP_DIRECTORY = os.path.join(TEMP_FOLDER, "PostcodeParser")
-    LOGGING_FILE_PATH = os.path.join(TEMP_DIRECTORY, "log.log")
+    BASE_PATH = "C:\\Users\\Public\\Documents"
+    BASE_DIRECTORY = os.path.join(BASE_PATH, "PostcodeParser")
+    LOGGING_FILE_PATH = os.path.join(BASE_DIRECTORY, "log.log")
 
     EVENTS_FOLDER_NAME = "🛠️ Events"
     DATA_FOLDER_NAME = "🗂️ Data"
     PAF_FILE_NAME = "PAF.csv"
     ONS_FOLDER_NAME = "ONSPD_AUG_2024"
 
-    TEMP_PAF_CSV = os.path.join(TEMP_DIRECTORY, "tmp_paf_data.csv")
-    TEMP_ONS_CSV = os.path.join(TEMP_DIRECTORY, "tmp_ons_data.csv")
+    TEMP_PAF_CSV = os.path.join(BASE_DIRECTORY, "tmp_paf_data.csv")
+    TEMP_ONS_CSV = os.path.join(BASE_DIRECTORY, "tmp_ons_data.csv")
 
-    OUTPUT_DIRECTORY = os.path.join(TEMP_DIRECTORY, "output")
+    OUTPUT_DIRECTORY = os.path.join(BASE_DIRECTORY, "output")
 
     PAF_FORMAT = {
         "Organisation Name": 11,

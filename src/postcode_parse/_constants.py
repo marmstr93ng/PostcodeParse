@@ -7,6 +7,7 @@ class SystemDefs:
     BASE_PATH = "C:\\Users\\Public\\Documents"
     BASE_DIRECTORY = os.path.join(BASE_PATH, "PostcodeParser")
     LOGGING_FILE_PATH = os.path.join(BASE_DIRECTORY, "log.log")
+    SETTINGS_FILE = os.path.join(BASE_DIRECTORY, "settings.yml")
 
     EVENTS_FOLDER_NAME = "🛠️ Events"
     DATA_FOLDER_NAME = "🗂️ Data"

@@ -3,10 +3,11 @@ import atexit
 import csv
 import os
 import re
-from typing import Dict, Set, Tuple, Union
+from typing import Dict, Optional, Set, Tuple, Union
 
 import questionary
 import simplekml
+import yaml
 from _constants import PostcodeData, SystemDefs
 from _log import create_logger
 from tqdm import tqdm
@@ -18,7 +19,9 @@ def create_folder(path: str) -> None:
 
 
 def guided_option_entry() -> Tuple[str, Set[str]]:
-    space_path = questionary.path("What is the path to the SeedSowers Google Drive space?").ask()
+    space_path = read_space_path()
+    if not os.path.isdir(space_path):
+        space_path = questionary.path("What is the path to the SeedSowers Google Drive space?").ask()
 
     districts = set()
     while True:
@@ -27,6 +30,21 @@ def guided_option_entry() -> Tuple[str, Set[str]]:
             break
 
     return (space_path, districts)
+
+
+def read_space_path() -> Optional[str]:
+    try:
+        with open(SystemDefs.SETTINGS_FILE) as file:
+            settings = yaml.safe_load(file)
+            return settings.get("space_path", None)
+    except FileNotFoundError:
+        return None
+
+
+def write_space_path(path: str) -> None:
+    settings = {"space_path": path}
+    with open(SystemDefs.SETTINGS_FILE, "w") as file:
+        yaml.dump(settings, file)
 
 
 def data_transformation(space_path: str, desired_postcode_districts: Set[str]) -> Tuple[str, str]:
@@ -200,6 +218,7 @@ if __name__ == "__main__":
     elif args.mode == "manual":
         space_path, districts = args.space_path, set(args.districts)
 
+    write_space_path(space_path)
     paf_file_path, ons_data_path = data_transformation(space_path, districts)
     postcode_parse(paf_file_path, ons_data_path, districts)
     os.startfile(SystemDefs.OUTPUT_DIRECTORY)

@@ -19,7 +19,8 @@ dev = [
   "pyinstaller",
   "pre-commit",
   "ruff",
-  "types-tqdm"
+  "types-tqdm",
+  "types-PyYAML",
 ]
 
 [tool.ruff]

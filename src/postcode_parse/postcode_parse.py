@@ -3,7 +3,9 @@ import atexit
 import csv
 import os
 import re
-from typing import Dict, Optional, Set, Tuple, Union
+import sys
+from datetime import datetime
+from typing import Dict, Set, Tuple, Union
 
 import questionary
 import simplekml
@@ -18,10 +20,12 @@ def create_folder(path: str) -> None:
         os.makedirs(path)
 
 
-def guided_option_entry() -> Tuple[str, Set[str]]:
+def guided_option_entry() -> Tuple[str, str, Set[str]]:
     space_path = read_space_path()
     if not os.path.isdir(space_path):
-        space_path = questionary.path("What is the path to the SeedSowers Google Drive space?").ask()
+        space_path = questionary.path("What is the path to the SeedSower's Google Drive space?").ask()
+
+    event_location = questionary.text("What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)").ask()
 
     districts = set()
     while True:
@@ -29,16 +33,16 @@ def guided_option_entry() -> Tuple[str, Set[str]]:
         if not questionary.confirm("Add another district to extract?").ask():
             break
 
-    return (space_path, districts)
+    return (space_path, event_location, districts)
 
 
-def read_space_path() -> Optional[str]:
+def read_space_path() -> str:
     try:
         with open(SystemDefs.SETTINGS_FILE) as file:
             settings = yaml.safe_load(file)
-            return settings.get("space_path", None)
+            return settings.get("space_path", "")
     except FileNotFoundError:
-        return None
+        return ""
 
 
 def write_space_path(path: str) -> None:
@@ -47,9 +51,7 @@ def write_space_path(path: str) -> None:
         yaml.dump(settings, file)
 
 
-def data_transformation(space_path: str, desired_postcode_districts: Set[str]) -> Tuple[str, str]:
-    data_folder_path = os.path.join(space_path, SystemDefs.DATA_FOLDER_NAME)
-
+def data_transformation(data_folder_path: str, desired_postcode_districts: Set[str]) -> Tuple[str, str]:
     paf_file_path = os.path.join(data_folder_path, SystemDefs.PAF_FILE_NAME)
     final_paf_path = trim_file(
         paf_file_path, desired_postcode_districts, SystemDefs.PAF_FORMAT["Postcode"], SystemDefs.TEMP_PAF_CSV
@@ -91,7 +93,9 @@ def trim_file(data_path: str, desired_postcode_districts: Set[str], postcode_ind
     return output_path
 
 
-def postcode_parse(paf_file_path: str, ons_data_path: str, desired_postcode_districts: Set[str]) -> None:
+def postcode_parse(
+    paf_file_path: str, ons_data_path: str, desired_postcode_districts: Set[str], output_path: str
+) -> None:
     postcode_output_dict: Dict[str, PostcodeData] = {}
     unlocated_postcodes: Dict[str, int] = {}
 
@@ -125,8 +129,7 @@ def postcode_parse(paf_file_path: str, ons_data_path: str, desired_postcode_dist
             else:
                 logger.debug(f"{postcode} is NOT a desired address.")
 
-    create_folder(SystemDefs.OUTPUT_DIRECTORY)
-    path_without_ext = os.path.join(SystemDefs.OUTPUT_DIRECTORY, f"{'-'.join(desired_postcode_districts)} Postcodes")
+    path_without_ext = os.path.join(output_path, f"{'-'.join(desired_postcode_districts)} Postcodes")
     csv_output(postcode_output_dict, f"{path_without_ext}.csv")
     kml_output(postcode_output_dict, f"{path_without_ext}.kml")
     logger.info(unlocated_postcodes)
@@ -208,17 +211,36 @@ if __name__ == "__main__":
     guided_parser = subparsers.add_parser("guided", help="guide the user through the script option entry")
 
     manual_parser = subparsers.add_parser("manual", help="manually enter the script options")
-    manual_parser.add_argument("-s", "--space_path", required=True, help="path to Seedsowers Google Drive space")
+    manual_parser.add_argument("-s", "--space_path", required=True, help="path to Seedsower's Google Drive space")
+    manual_parser.add_argument(
+        "-e", "--event_location", nargs="+", required=True, help="name of the Seedsower's event location"
+    )
     manual_parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
 
     parser.set_defaults(mode="guided")
     args = parser.parse_args()
     if args.mode == "guided":
-        space_path, districts = guided_option_entry()
+        space_path, event_location, districts = guided_option_entry()
     elif args.mode == "manual":
-        space_path, districts = args.space_path, set(args.districts)
+        space_path, event_location, districts = args.space_path, args.event_location, set(args.districts)
 
     write_space_path(space_path)
-    paf_file_path, ons_data_path = data_transformation(space_path, districts)
-    postcode_parse(paf_file_path, ons_data_path, districts)
-    os.startfile(SystemDefs.OUTPUT_DIRECTORY)
+
+    events_folder_path = os.path.join(space_path, SystemDefs.EVENTS_FOLDER_NAME)
+    current_date = datetime.now()
+    month_year = current_date.strftime("%B%Y")
+    event_location_with_date = f"{event_location}_{month_year}"
+    event_path = os.path.join(events_folder_path, event_location_with_date)
+    logger.info(f"Event path: {event_path}")
+    if os.path.isdir(event_path):
+        logger.error(f"Failure: The event folder '{event_path}' already exists.")
+        sys.exit(1)
+
+    create_folder(event_path)
+    create_folder(os.path.join(event_path, "Output"))
+
+    data_folder_path = os.path.join(space_path, SystemDefs.DATA_FOLDER_NAME)
+    paf_file_path, ons_data_path = data_transformation(data_folder_path, districts)
+
+    postcode_parse(paf_file_path, ons_data_path, districts, event_path)
+    os.startfile(event_path)

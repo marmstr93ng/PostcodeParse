@@ -17,8 +17,6 @@ class SystemDefs:
     TEMP_PAF_CSV = os.path.join(BASE_DIRECTORY, "tmp_paf_data.csv")
     TEMP_ONS_CSV = os.path.join(BASE_DIRECTORY, "tmp_ons_data.csv")
 
-    OUTPUT_DIRECTORY = os.path.join(BASE_DIRECTORY, "output")
-
     PAF_FORMAT = {
         "Organisation Name": 11,
         "Department Name": 10,

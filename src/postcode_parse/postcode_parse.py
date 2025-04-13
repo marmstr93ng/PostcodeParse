@@ -27,11 +27,10 @@ def guided_option_entry() -> Tuple[str, str, Set[str]]:
 
     event_location = questionary.text("What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)").ask()
 
-    districts = set()
-    while True:
-        districts.add(questionary.text("What postcode districts should be extracted?").ask())
-        if not questionary.confirm("Add another district to extract?").ask():
-            break
+    districts_input = questionary.text(
+        "Enter all postcode districts to extract (separate them with commas e.g CV1, CV5):"
+    ).ask()
+    districts = {district.strip() for district in districts_input.split(",") if district.strip()}
 
     return (space_path, event_location, districts)
 

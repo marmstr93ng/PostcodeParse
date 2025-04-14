@@ -1,12 +1,13 @@
 import argparse
 import atexit
+import calendar
 import csv
 import os
 import re
 import shutil
 import sys
 from datetime import datetime
-from typing import Dict, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 import questionary
 import simplekml
@@ -21,19 +22,22 @@ def create_folder(path: str) -> None:
         os.makedirs(path)
 
 
-def guided_option_entry() -> Tuple[str, str, Set[str]]:
+def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
     space_path = read_space_path()
     if not os.path.isdir(space_path):
         space_path = questionary.path("What is the path to the SeedSower's Google Drive space?").ask()
 
     event_location = questionary.text("What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)").ask()
 
+    month_choices = get_month_choices()
+    event_date = questionary.select("When is the Seedsower's event planned to happen?", choices=month_choices).ask()
+
     districts_input = questionary.text(
         "Enter all postcode districts to extract (separate them with commas e.g CV1,CV5):"
     ).ask()
     districts = {district.strip() for district in districts_input.split(",") if district.strip()}
 
-    return (space_path, event_location, districts)
+    return (space_path, event_location, event_date, districts)
 
 
 def read_space_path() -> str:
@@ -49,6 +53,29 @@ def write_space_path(path: str) -> None:
     settings = {"space_path": path}
     with open(SystemDefs.SETTINGS_FILE, "w") as file:
         yaml.dump(settings, file)
+
+
+def get_month_choices(num_months: int = 12) -> List[str]:
+    """
+    Generate a list of month and year options starting from today's date for the next `num_months`.
+
+    Args:
+        num_months (int): The number of months to generate. Defaults to 12.
+
+    Returns:
+        List[str]: A list of options in the format "MonthYear" (e.g., "April2026").
+    """
+    today = datetime.today()
+    current_month = today.month
+    current_year = today.year
+
+    months_and_years = []
+    for i in range(num_months):
+        month = (current_month + i - 1) % 12 + 1
+        year = current_year + (current_month + i - 1) // 12
+        months_and_years.append(f"{calendar.month_name[month]}{year}")
+
+    return months_and_years
 
 
 def data_transformation(data_folder_path: str, desired_postcode_districts: Set[str]) -> Tuple[str, str]:
@@ -237,21 +264,33 @@ if __name__ == "__main__":
     manual_parser.add_argument(
         "-e", "--event_location", nargs="+", required=True, help="name of the Seedsower's event location"
     )
-    manual_parser.add_argument("-d", "--districts", nargs="+", required=True, help="postcode districts to extract")
+    manual_parser.add_argument(
+        "-d",
+        "--event_date",
+        nargs="+",
+        required=True,
+        help='date of the Seedsower\'s event location (Format as "MonthYear")',
+    )
+    manual_parser.add_argument(
+        "-p", "--postcode_districts", nargs="+", required=True, help="postcode districts to extract"
+    )
 
     parser.set_defaults(mode="guided")
     args = parser.parse_args()
     if args.mode == "guided":
-        space_path, event_location, districts = guided_option_entry()
+        space_path, event_location, event_date, postcode_districts = guided_option_entry()
     elif args.mode == "manual":
-        space_path, event_location, districts = args.space_path, args.event_location, set(args.districts)
+        space_path, event_location, event_date, postcode_districts = (
+            args.space_path,
+            args.event_location,
+            args.event_date,
+            set(args.postcode_districts),
+        )
 
     write_space_path(space_path)
 
     events_folder_path = os.path.join(space_path, SystemDefs.EVENTS_FOLDER_NAME)
-    current_date = datetime.now()
-    month_year = current_date.strftime("%B%Y")
-    event_location_with_date = f"{event_location}_{month_year}"
+    event_location_with_date = f"{event_location}_{event_date}"
     event_path = os.path.join(events_folder_path, event_location_with_date)
     logger.info(f"Event path: {event_path}")
     if os.path.isdir(event_path):
@@ -262,9 +301,9 @@ if __name__ == "__main__":
     create_folder(os.path.join(event_path, "Output"))
 
     data_folder_path = os.path.join(space_path, SystemDefs.DATA_FOLDER_NAME)
-    paf_file_path, ons_data_path = data_transformation(data_folder_path, districts)
+    paf_file_path, ons_data_path = data_transformation(data_folder_path, postcode_districts)
 
-    postcode_parse(paf_file_path, ons_data_path, districts, event_path)
+    postcode_parse(paf_file_path, ons_data_path, postcode_districts, event_path)
 
     qgis_template_folder_path = os.path.join(space_path, SystemDefs.QGIS_TEMPLATE_FOLDER_NAME)
     copy_directory_contents(qgis_template_folder_path, event_path)

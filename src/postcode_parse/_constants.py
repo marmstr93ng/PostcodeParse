@@ -11,6 +11,8 @@ class SystemDefs:
 
     EVENTS_FOLDER_NAME = "🛠️ Events"
     DATA_FOLDER_NAME = "🗂️ Data"
+    TEMPLATES_FOLDER_NAME = "♻️ Templates"
+    QGIS_TEMPLATE_FOLDER_NAME = os.path.join(TEMPLATES_FOLDER_NAME, "QGIS")
     PAF_FILE_NAME = "PAF.csv"
     ONS_FOLDER_NAME = "ONSPD_AUG_2024"
 

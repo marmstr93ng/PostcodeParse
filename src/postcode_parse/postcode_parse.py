@@ -3,6 +3,7 @@ import atexit
 import csv
 import os
 import re
+import shutil
 import sys
 from datetime import datetime
 from typing import Dict, Set, Tuple, Union
@@ -28,7 +29,7 @@ def guided_option_entry() -> Tuple[str, str, Set[str]]:
     event_location = questionary.text("What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)").ask()
 
     districts_input = questionary.text(
-        "Enter all postcode districts to extract (separate them with commas e.g CV1, CV5):"
+        "Enter all postcode districts to extract (separate them with commas e.g CV1,CV5):"
     ).ask()
     districts = {district.strip() for district in districts_input.split(",") if district.strip()}
 
@@ -128,9 +129,9 @@ def postcode_parse(
             else:
                 logger.debug(f"{postcode} is NOT a desired address.")
 
-    path_without_ext = os.path.join(output_path, f"{'-'.join(desired_postcode_districts)} Postcodes")
-    csv_output(postcode_output_dict, f"{path_without_ext}.csv")
-    kml_output(postcode_output_dict, f"{path_without_ext}.kml")
+    csv_output(postcode_output_dict, os.path.join(output_path, "Postcodes.csv"))
+    kml_output(postcode_output_dict, os.path.join(output_path, "Postcodes.kml"))
+    create_postcode_info_txt(output_path, desired_postcode_districts)
     logger.info(unlocated_postcodes)
 
 
@@ -199,6 +200,28 @@ def kml_output(postcode_output_dict: Dict[str, PostcodeData], output_path: str) 
     kml.save(output_path)
 
 
+def create_postcode_info_txt(output_path: str, desired_postcode_districts: Set[str]) -> None:
+    path_without_ext = os.path.join(output_path, f"{''.join(desired_postcode_districts)} Postcodes")
+    open(f"{path_without_ext}.txt", "w").close()
+
+
+def copy_directory_contents(source_dir: str, destination_dir: str) -> None:
+    if not os.path.exists(source_dir):
+        logger.error(f"Source directory '{source_dir}' does not exist.")
+        sys.exit(1)
+    for item in os.listdir(source_dir):
+        source_item = os.path.join(source_dir, item)
+        destination_item = os.path.join(destination_dir, item)
+
+        try:
+            if os.path.isdir(source_item):
+                shutil.copytree(source_item, destination_item)
+            else:
+                shutil.copy2(source_item, destination_item)
+        except PermissionError:
+            logger.warning(f"Skipping file due to permission error: {source_item}")
+
+
 if __name__ == "__main__":
     atexit.register(input, "Press Enter to exit...")
     create_folder(SystemDefs.BASE_DIRECTORY)
@@ -242,4 +265,11 @@ if __name__ == "__main__":
     paf_file_path, ons_data_path = data_transformation(data_folder_path, districts)
 
     postcode_parse(paf_file_path, ons_data_path, districts, event_path)
+
+    qgis_template_folder_path = os.path.join(space_path, SystemDefs.QGIS_TEMPLATE_FOLDER_NAME)
+    copy_directory_contents(qgis_template_folder_path, event_path)
+    qgis_file_path = os.path.join(event_path, "Template.qgz")
+    new_qgis_file_path = os.path.join(event_path, f"{event_location}.qgz")
+    os.rename(qgis_file_path, new_qgis_file_path)
+
     os.startfile(event_path)

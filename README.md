@@ -6,7 +6,7 @@ An application to manipulate postcode data (Windows ONLY).
 
 - **Python 3**
 - **Python virtual environment** - Setup a folder called `.venv` with `python -m venv .venv` and activate with `.\\.venv\\Scripts\\activate`
-- **Dependencies** - Installed by running `pip install -e .[dev]` (remember to do so from inside a virtual environment)
+- **Dependencies** - Installed by running `pip install -e .[dev] --upgrade` (remember to do so from inside a virtual environment)
 - **Setup Pre-commit hooks** - run `pre-commit install`
 
 ## Create Release

@@ -9,6 +9,9 @@ class SystemDefs:
     LOGGING_FILE_PATH = os.path.join(BASE_DIRECTORY, "log.log")
     SETTINGS_FILE = os.path.join(BASE_DIRECTORY, "settings.yml")
 
+    GITHUB_REPO = "marmstr93ng/PostcodeParse"
+    INSTALLER_NAME = "postcode_parse_installer.exe"
+
     EVENTS_FOLDER_NAME = "🛠️ Events"
     DATA_FOLDER_NAME = "🗂️ Data"
     TEMPLATES_FOLDER_NAME = "♻️ Templates"

@@ -2,6 +2,7 @@ import argparse
 import atexit
 import calendar
 import os
+import subprocess
 import sys
 from datetime import datetime
 from typing import List, Set, Tuple
@@ -9,8 +10,15 @@ from typing import List, Set, Tuple
 import questionary
 from _constants import SystemDefs
 from _log import create_logger
+from _version import __version__
 from data_processing import data_transformation, postcode_parse
 from io_utils import copy_directory_contents, create_folder, read_space_path, write_space_path
+from updater import UpdateManager, VersionCheckError
+
+
+def prompt_update(version_info: str) -> bool:
+    """User confirmation dialog with rich formatting"""
+    return questionary.confirm(f"🎯 {version_info}\n🔧 Install update now?", default=True, auto_enter=False).ask()
 
 
 def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
@@ -25,15 +33,17 @@ def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
     """
     space_path = read_space_path()
     if not os.path.isdir(space_path):
-        space_path = questionary.path("What is the path to the SeedSower's Google Drive space?").ask()
+        space_path = questionary.path("📁 What is the path to the SeedSower's Google Drive space?").ask()
 
-    event_location = questionary.text("What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)").ask()
+    event_location = questionary.text(
+        "📍 What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)"
+    ).ask()
 
     month_choices = _get_month_choices()
-    event_date = questionary.select("When is the Seedsower's event planned to happen?", choices=month_choices).ask()
+    event_date = questionary.select("📅 When is the Seedsower's event planned to happen?", choices=month_choices).ask()
 
     districts_input = questionary.text(
-        "Enter all postcode districts to be extracted (separate them with commas e.g CV1,CV5):"
+        "✉️ Enter all postcode districts to be extracted (separate them with commas e.g CV1,CV5):"
     ).ask()
     districts = {district.strip() for district in districts_input.split(",") if district.strip()}
 
@@ -149,9 +159,27 @@ def parse_arguments() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    atexit.register(input, "Press Enter to exit...")
     create_folder(SystemDefs.BASE_DIRECTORY)
     logger = create_logger(file_append=False)
+
+    try:
+        updater = UpdateManager(
+            current_version=__version__, repo=SystemDefs.GITHUB_REPO, installer_name=SystemDefs.INSTALLER_NAME
+        )
+
+        update_available, version_message = updater.check_version()
+        logger.info(version_message)
+
+        if update_available and prompt_update(version_message):
+            installer_path = updater.download_installer()
+            logger.info(f"🚀 Launching installer: {installer_path}")
+            subprocess.Popen([installer_path])
+            sys.exit(0)
+
+    except VersionCheckError as e:
+        logger.error(str(e))
+
+    atexit.register(input, "Press Enter to exit...")
 
     args = parse_arguments()
     if args.mode == "guided":

@@ -16,6 +16,26 @@ from io_utils import copy_directory_contents, create_folder, read_space_path, wr
 from updater import UpdateManager, VersionCheckError
 
 
+def handle_updates() -> None:
+    """Check for updates and handle installation process."""
+    try:
+        updater = UpdateManager(
+            current_version=__version__, repo=SystemDefs.GITHUB_REPO, installer_name=SystemDefs.INSTALLER_NAME
+        )
+
+        update_available, version_message = updater.check_version()
+        logger.info(version_message)
+
+        if update_available and prompt_update(version_message):
+            installer_path = updater.download_installer()
+            logger.info(f"🚀 Launching installer: {installer_path}")
+            subprocess.Popen([installer_path])
+            sys.exit(0)
+
+    except VersionCheckError as e:
+        logger.error(str(e))
+
+
 def prompt_update(version_info: str) -> bool:
     """User confirmation dialog with rich formatting"""
     return questionary.confirm(f"🎯 {version_info}\n🔧 Install update now?", default=True, auto_enter=False).ask()
@@ -158,59 +178,57 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-    create_folder(SystemDefs.BASE_DIRECTORY)
-    logger = create_logger(file_append=False)
-
-    try:
-        updater = UpdateManager(
-            current_version=__version__, repo=SystemDefs.GITHUB_REPO, installer_name=SystemDefs.INSTALLER_NAME
-        )
-
-        update_available, version_message = updater.check_version()
-        logger.info(version_message)
-
-        if update_available and prompt_update(version_message):
-            installer_path = updater.download_installer()
-            logger.info(f"🚀 Launching installer: {installer_path}")
-            subprocess.Popen([installer_path])
-            sys.exit(0)
-
-    except VersionCheckError as e:
-        logger.error(str(e))
-
-    atexit.register(input, "Press Enter to exit...")
-
-    args = parse_arguments()
-    if args.mode == "guided":
-        space_path, event_location, event_date, postcode_districts = guided_option_entry()
-    elif args.mode == "manual":
-        space_path, event_location, event_date, postcode_districts = (
-            args.space_path,
-            args.event_location,
-            args.event_date,
-            set(args.postcode_districts),
-        )
-
-    write_space_path(space_path)
-
+def create_event_folder_structure(space_path: str, event_location: str, event_date: str) -> str:
+    """Create directory structure for new event."""
     event_path = os.path.join(space_path, SystemDefs.EVENTS_FOLDER_NAME, f"{event_location}_{event_date}")
     logger.info(f"Event path: {event_path}")
+
     if os.path.isdir(event_path):
         logger.error(f"Failure: The event folder '{event_path}' already exists.")
         sys.exit(1)
 
     create_folder(event_path)
     create_folder(os.path.join(event_path, "Output"))
+    return event_path
 
+
+def setup_qgis_template(space_path: str, event_path: str, event_location: str) -> None:
+    """Configure QGIS template files for the event."""
     qgis_template_folder_path = os.path.join(space_path, SystemDefs.QGIS_TEMPLATE_FOLDER_NAME)
     copy_directory_contents(qgis_template_folder_path, event_path)
+
     qgis_file_path = os.path.join(event_path, "Template.qgz")
     new_qgis_file_path = os.path.join(event_path, f"{event_location}.qgz")
     os.rename(qgis_file_path, new_qgis_file_path)
 
+
+def process_data(space_path: str, postcode_districts: Set[str], event_path: str) -> None:
+    """Process geographical data and launch event folder."""
     data_folder_path = os.path.join(space_path, SystemDefs.DATA_FOLDER_NAME)
+
     paf_file_path, ons_data_path = data_transformation(data_folder_path, postcode_districts)
     postcode_parse(paf_file_path, ons_data_path, postcode_districts, event_path)
+
+
+if __name__ == "__main__":
+    create_folder(SystemDefs.BASE_DIRECTORY)
+    logger = create_logger(file_append=False)
+    handle_updates()
+    atexit.register(input, "Press Enter to exit...")
+
+    args = parse_arguments()
+    if args.mode == "guided":
+        space_path, event_location, event_date, postcode_districts = guided_option_entry()
+    else:
+        space_path = args.space_path
+        event_location = args.event_location
+        event_date = args.event_date
+        postcode_districts = set(args.postcode_districts)
+
+    write_space_path(space_path)
+    event_path = create_event_folder_structure(space_path, event_location, event_date)
+    setup_qgis_template(space_path, event_path, event_location)
+
+    process_data(space_path=space_path, postcode_districts=set(postcode_districts), event_path=event_path)
 
     os.startfile(event_path)

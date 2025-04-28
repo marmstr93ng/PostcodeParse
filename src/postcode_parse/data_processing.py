@@ -243,7 +243,7 @@ def _generate_outputs(
     csv_output(postcode_output_dict, os.path.join(output_path, "Postcodes.csv"))
     kml_output(postcode_output_dict, os.path.join(output_path, "Postcodes.kml"))
     create_postcode_info_txt(output_path, desired_postcode_districts)
-    logger.info(unlocated_postcodes)
+    logger.info(f"Postcodes with no Lat/Long: {unlocated_postcodes}")
 
 
 def _is_desired_postcode_district(data: str, desired_postcode_districts: Set[str]) -> bool:

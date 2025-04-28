@@ -18,7 +18,7 @@ An application to manipulate postcode data (Windows ONLY).
 
 ## Build Exe
 
-- `pyinstaller --onefile src/postcode_parse/postcode_parse.py --clean --icon=assets/postcode.ico --distpath=./`
+- `pyinstaller --console --onefile src/postcode_parse/postcode_parse.py --clean --icon=assets/postcode.ico --distpath=./`
 - Compile the `postcode_parser.iss` in Inno Setup Compiler
 - Run the installer (to install or to update)
 

@@ -73,7 +73,9 @@ def guided_option_entry() -> Tuple[str, str, str, Set[str], bool]:
         selected_event = questionary.select("📂 Select event to modify:", choices=available_events).ask()
         event_location, event_date = selected_event.rsplit("_", 1)
     else:
-        event_location = questionary.text("📍 What is the Seedsower's event location?").ask()
+        event_location = questionary.text(
+            "📍 What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)?"
+        ).ask()
         month = questionary.select("📅 Select event month:", choices=SystemDefs.MONTHS).ask()
         year = questionary.select("📅 Select event year:", choices=SystemDefs.YEARS).ask()
         event_date = event_date_format(month, year)

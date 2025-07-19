@@ -1,5 +1,6 @@
 import argparse
 import atexit
+import glob
 import os
 import subprocess
 import sys
@@ -34,6 +35,12 @@ def handle_updates() -> None:
         logger.error(str(e))
 
 
+def prompt_event_action() -> str:
+    return questionary.select(
+        "🪜 What would you like to do?", choices=["Create New Event", "Modify Postcodes In Existing Event"]
+    ).ask()
+
+
 def prompt_update(version_info: str) -> bool:
     """User confirmation dialog with rich formatting"""
     return questionary.confirm(f"🎯 {version_info}\n🔧 Install update now?", default=True, auto_enter=False).ask()
@@ -43,7 +50,7 @@ def event_date_format(month: str, year: str) -> str:
     return f"{month}{year}"
 
 
-def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
+def guided_option_entry() -> Tuple[str, str, str, Set[str], bool]:
     """Guide user through interactive parameter collection.
 
     Returns:
@@ -51,26 +58,30 @@ def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
         - space_path (str): Path to Google Drive directory
         - event_location (str): Location name for the event
         - event_date (str): Formatted as MonthYear (e.g. 'April2025')
-        - postcode_districts (Set[str]): Set of cleaned postcode districts
+        - postcode_districts (Set[str]): Set of cleaned postcode districts,
+        - modify (bool): Flag if action is to modify an event
     """
     space_path = read_space_path()
     if not os.path.isdir(space_path):
         space_path = questionary.path("📁 What is the path to the SeedSower's Google Drive space?").ask()
 
-    event_location = questionary.text(
-        "📍 What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)"
-    ).ask()
+    is_modify = prompt_event_action() == "Modify Postcodes In Existing Event"
 
-    month = questionary.select("📅 Select event month:", choices=SystemDefs.MONTHS).ask()
-    year = questionary.select("📅 Select event year:", choices=SystemDefs.YEARS).ask()
-    event_date = event_date_format(month, year)
+    if is_modify:
+        events_dir = os.path.join(space_path, SystemDefs.EVENTS_FOLDER_NAME)
+        available_events = [d for d in os.listdir(events_dir) if os.path.isdir(os.path.join(events_dir, d))]
+        selected_event = questionary.select("📂 Select event to modify:", choices=available_events).ask()
+        event_location, event_date = selected_event.rsplit("_", 1)
+    else:
+        event_location = questionary.text("📍 What is the Seedsower's event location?").ask()
+        month = questionary.select("📅 Select event month:", choices=SystemDefs.MONTHS).ask()
+        year = questionary.select("📅 Select event year:", choices=SystemDefs.YEARS).ask()
+        event_date = event_date_format(month, year)
 
-    districts_input = questionary.text(
-        "✉️ Enter all postcode districts to be extracted (separate them with commas e.g CV1,CV5):"
-    ).ask()
-    districts = {district.strip() for district in districts_input.split(",") if district.strip()}
+    districts_input = questionary.text("✉️ Enter all postcode districts of the event (comma-separated: CV1,CV5):").ask()
+    districts = {d.strip() for d in districts_input.split(",") if d.strip()}
 
-    return (space_path, event_location, event_date, districts)
+    return space_path, event_location, event_date, districts, is_modify
 
 
 def _create_guided_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -108,6 +119,12 @@ def _create_manual_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
             python script.py manual -s "C:/Google Drive/SeedSower" -e Belfast -m April -y 2025 -p BT1 BT2
             python script.py manual --space_path "~/SeedSower" --event_location Derry \\
                 --event_month May --event_year 2025 --postcode_districts BT48 BT49""",
+    )
+
+    manual_parser.add_argument(
+        "--modify",
+        action="store_true",
+        help="Modify an existing event instead of creating a new one (folder must already exist)",
     )
 
     manual_parser.add_argument(
@@ -180,6 +197,17 @@ def create_event_folder_structure(space_path: str, event_location: str, event_da
     return event_path
 
 
+def remove_txt_files_from_event(event_path: str) -> None:
+    """Deletes all .txt files in the specified event folder and its subfolders."""
+    txt_files = glob.glob(os.path.join(event_path, "**", "*.txt"), recursive=True)
+    for file_path in txt_files:
+        try:
+            os.remove(file_path)
+            logger.info(f"🗑️ Removed: {file_path}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not delete {file_path}: {e}")
+
+
 def setup_qgis_template(space_path: str, event_path: str, event_location: str) -> None:
     """Configure QGIS template files for the event."""
     qgis_template_folder_path = os.path.join(space_path, SystemDefs.QGIS_TEMPLATE_FOLDER_NAME)
@@ -206,16 +234,26 @@ if __name__ == "__main__":
 
     args = parse_arguments()
     if args.mode == "guided":
-        space_path, event_location, event_date, postcode_districts = guided_option_entry()
+        space_path, event_location, event_date, postcode_districts, is_modify = guided_option_entry()
     else:
         space_path = args.space_path
         event_location = args.event_location
         event_date = event_date_format(args.event_month, args.event_year)
         postcode_districts = set(args.postcode_districts)
+        is_modify = args.modify
 
     write_space_path(space_path)
-    event_path = create_event_folder_structure(space_path, event_location, event_date)
-    setup_qgis_template(space_path, event_path, event_location)
+
+    if is_modify:
+        event_path = os.path.join(space_path, SystemDefs.EVENTS_FOLDER_NAME, f"{event_location}_{event_date}")
+        if not os.path.isdir(event_path):
+            logger.error(f"❌ Event folder does not exist: {event_path}")
+            sys.exit(1)
+        logger.info(f"🔧 Modifying event: {event_path}")
+        remove_txt_files_from_event(event_path)
+    else:
+        event_path = create_event_folder_structure(space_path, event_location, event_date)
+        setup_qgis_template(space_path, event_path, event_location)
 
     process_data(space_path=space_path, postcode_districts=set(postcode_districts), event_path=event_path)
 

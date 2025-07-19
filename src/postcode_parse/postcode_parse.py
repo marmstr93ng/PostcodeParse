@@ -3,7 +3,6 @@ import atexit
 import os
 import subprocess
 import sys
-from datetime import datetime
 from typing import Set, Tuple
 
 import questionary
@@ -40,6 +39,10 @@ def prompt_update(version_info: str) -> bool:
     return questionary.confirm(f"🎯 {version_info}\n🔧 Install update now?", default=True, auto_enter=False).ask()
 
 
+def event_date_format(month: str, year: str) -> str:
+    return f"{month}{year}"
+
+
 def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
     """Guide user through interactive parameter collection.
 
@@ -58,27 +61,9 @@ def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
         "📍 What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)"
     ).ask()
 
-    months = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ]
-    month = questionary.select("📅 Select event month:", choices=months).ask()
-
-    this_year = datetime.now().year
-    years = [str(y) for y in range(this_year, this_year + 6)]
-    year = questionary.select("📅 Select event year:", choices=years).ask()
-
-    event_date = f"{month}{year}"
+    month = questionary.select("📅 Select event month:", choices=SystemDefs.MONTHS).ask()
+    year = questionary.select("📅 Select event year:", choices=SystemDefs.YEARS).ask()
+    event_date = event_date_format(month, year)
 
     districts_input = questionary.text(
         "✉️ Enter all postcode districts to be extracted (separate them with commas e.g CV1,CV5):"
@@ -120,9 +105,9 @@ def _create_manual_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
         description="\033[1mManual Mode\033[0m\nProvide all parameters through command arguments",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-            python script.py manual -s "C:/Google Drive/SeedSower" -e Belfast -d April2025 -p BT1 BT2
+            python script.py manual -s "C:/Google Drive/SeedSower" -e Belfast -m April -y 2025 -p BT1 BT2
             python script.py manual --space_path "~/SeedSower" --event_location Derry \\
-                --event_date May2025 --postcode_districts BT48 BT49""",
+                --event_month May --event_year 2025 --postcode_districts BT48 BT49""",
     )
 
     manual_parser.add_argument(
@@ -137,7 +122,14 @@ def _create_manual_parser(subparsers: argparse._SubParsersAction) -> argparse.Ar
     )
 
     manual_parser.add_argument(
-        "-d", "--event_date", required=True, help='Event date in MonthYear format (e.g. "April2025")'
+        "-m", "--event_month", required=True, choices=SystemDefs.MONTHS, help="Event month (e.g. 'April')"
+    )
+    manual_parser.add_argument(
+        "-y",
+        "--event_year",
+        required=True,
+        choices=SystemDefs.YEARS,
+        help=f"Event year (one of: {', '.join(SystemDefs.YEARS)})",
     )
 
     manual_parser.add_argument(
@@ -218,7 +210,7 @@ if __name__ == "__main__":
     else:
         space_path = args.space_path
         event_location = args.event_location
-        event_date = args.event_date
+        event_date = event_date_format(args.event_month, args.event_year)
         postcode_districts = set(args.postcode_districts)
 
     write_space_path(space_path)

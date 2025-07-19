@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime
 from typing import Union
 
 
@@ -42,6 +43,24 @@ class SystemDefs:
     ONS_FORMAT = {"Postcode": 2, "Latitude": 41, "Longitude": 42}
 
     POSTCODE_DISTRICT_PATTERN = re.compile(r"^([A-Z]{1,2}[0-9]{1,2})")
+
+    MONTHS = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
+
+    this_year = datetime.now().year
+    YEARS = [str(y) for y in range(this_year, this_year + 6)]
 
 
 class PostcodeData:

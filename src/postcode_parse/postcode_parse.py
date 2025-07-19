@@ -1,11 +1,10 @@
 import argparse
 import atexit
-import calendar
 import os
 import subprocess
 import sys
 from datetime import datetime
-from typing import List, Set, Tuple
+from typing import Set, Tuple
 
 import questionary
 from _constants import SystemDefs
@@ -59,8 +58,27 @@ def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
         "📍 What is the Seedsower's event location (e.g. Antrim, Dumfries, Exeter?)"
     ).ask()
 
-    month_choices = _get_month_choices()
-    event_date = questionary.select("📅 When is the Seedsower's event planned to happen?", choices=month_choices).ask()
+    months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
+    month = questionary.select("📅 Select event month:", choices=months).ask()
+
+    this_year = datetime.now().year
+    years = [str(y) for y in range(this_year, this_year + 6)]
+    year = questionary.select("📅 Select event year:", choices=years).ask()
+
+    event_date = f"{month}{year}"
 
     districts_input = questionary.text(
         "✉️ Enter all postcode districts to be extracted (separate them with commas e.g CV1,CV5):"
@@ -68,28 +86,6 @@ def guided_option_entry() -> Tuple[str, str, str, Set[str]]:
     districts = {district.strip() for district in districts_input.split(",") if district.strip()}
 
     return (space_path, event_location, event_date, districts)
-
-
-def _get_month_choices(num_months: int = 12) -> List[str]:
-    """Generate month-year options for event planning.
-
-    Args:
-        num_months: Number of future months to generate (default: 12)
-
-    Returns:
-        List of formatted MonthYear strings (e.g. ['April2025', 'May2025'])
-    """
-    today = datetime.today()
-    current_month = today.month
-    current_year = today.year
-
-    months_and_years = []
-    for i in range(num_months):
-        month = (current_month + i - 1) % 12 + 1
-        year = current_year + (current_month + i - 1) // 12
-        months_and_years.append(f"{calendar.month_name[month]}{year}")
-
-    return months_and_years
 
 
 def _create_guided_parser(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
